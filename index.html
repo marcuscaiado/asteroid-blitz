@@ -12,10 +12,11 @@
     .arcade-nav { position:absolute; top:16px; right:16px; z-index:100; background:rgba(0,0,0,0.7); border:2px solid #00f5ff; color:#00f5ff; padding:8px 16px; border-radius:8px; font-weight:bold; text-decoration:none; font-size:13px; box-shadow:0 0 15px rgba(0,245,255,0.4); }
     .hud { position:absolute; top:16px; left:16px; font-family:monospace; font-size:20px; font-weight:bold; color:#00f5ff; text-shadow:0 0 10px #00f5ff; pointer-events:none; }
     .mobile-controls { position:absolute; bottom:20px; left:0; right:0; display:flex; justify-content:space-between; padding:0 24px; pointer-events:none; }
-    .ctrl-btn { width:65px; height:65px; border-radius:50%; background:rgba(0,245,255,0.2); border:2px solid #00f5ff; color:#fff; font-size:22px; font-weight:bold; display:flex; align-items:center; justify-content:center; pointer-events:auto; box-shadow:0 0 15px rgba(0,245,255,0.3); }
+    .ctrl-btn { width:70px; height:70px; border-radius:50%; background:rgba(0,245,255,0.2); border:2px solid #00f5ff; color:#fff; font-size:22px; font-weight:bold; display:flex; align-items:center; justify-content:center; pointer-events:auto; box-shadow:0 0 15px rgba(0,245,255,0.3); }
     .ctrl-btn:active { background:#00f5ff; color:#000; }
     .fire-btn { background:rgba(255,0,127,0.3); border-color:#ff007f; box-shadow:0 0 15px rgba(255,0,127,0.4); }
     .fire-btn:active { background:#ff007f; color:#fff; }
+    .aim-hint { position:absolute; bottom:20px; left:50%; transform:translateX(-50%); font-size:14px; color:#aaa; pointer-events:none; }
     #modal { position:absolute; inset:0; background:rgba(0,0,0,0.85); display:none; flex-direction:column; align-items:center; justify-content:center; gap:16px; z-index:200; }
     #modal h1 { color:#ff007f; font-size:42px; text-shadow:0 0 20px #ff007f; }
     .btn { background:linear-gradient(135deg,#00f5ff,#ff007f); border:none; color:#fff; padding:12px 32px; font-size:18px; font-weight:bold; border-radius:8px; cursor:pointer; text-decoration:none; box-shadow:0 0 20px rgba(0,245,255,0.5); }
@@ -25,16 +26,11 @@
   <div id="canvas-container">
     <a href="https://marcuscaiado.github.io/marcus-arcade/" class="arcade-nav">🕹️ Arcade Hub</a>
     <div class="hud">SCORE: <span id="score-val">0</span> | LIVES: <span id="lives-val">3</span></div>
+    <div class="aim-hint">Aim with Mouse / Touch • Click or Space to Fire ⚡</div>
     <canvas id="gameCanvas" width="800" height="600"></canvas>
     <div class="mobile-controls">
-      <div style="display:flex; gap:14px;">
-        <div class="ctrl-btn" id="btn-left">◀</div>
-        <div class="ctrl-btn" id="btn-right">▶</div>
-      </div>
-      <div style="display:flex; gap:14px;">
-        <div class="ctrl-btn" id="btn-thrust">▲</div>
-        <div class="ctrl-btn fire-btn" id="btn-fire">⚡</div>
-      </div>
+      <div class="ctrl-btn" id="btn-thrust">▲ THRUST</div>
+      <div class="ctrl-btn fire-btn" id="btn-fire">⚡ FIRE</div>
     </div>
     <div id="modal">
       <h1 id="modal-title">SHIP DESTROYED 💥</h1>
@@ -63,9 +59,10 @@
     }
 
     let score = 0, lives = 3, isGameOver = false;
-    let ship = { x: 400, y: 300, r: 14, angle: -Math.PI/2, rotSpd: 0, vx: 0, vy: 0, thrust: false, invincible: 0 };
+    let ship = { x: 400, y: 300, r: 14, angle: -Math.PI/2, vx: 0, vy: 0, invincible: 60 };
     let bullets = [], asteroids = [], particles = [];
-    let keys = { left:false, right:false, thrust:false, fire:false };
+    let isThrusting = false, isFiring = false, shootTimer = 0;
+    let targetAngle = -Math.PI/2;
 
     function spawnAsteroids(count) {
       for (let i = 0; i < count; i++) {
@@ -94,47 +91,60 @@
 
     spawnAsteroids(5);
 
-    // Keyboard & Controls
+    // Aiming & Mouse / Touch
+    const setAimPos = (cx, cy) => {
+      const rect = canvas.getBoundingClientRect();
+      const mx = ((cx - rect.left) / rect.width) * 800;
+      const my = ((cy - rect.top) / rect.height) * 600;
+      targetAngle = Math.atan2(my - ship.y, mx - ship.x);
+    };
+
+    window.addEventListener('mousemove', e => setAimPos(e.clientX, e.clientY));
+    window.addEventListener('mousedown', e => {
+      if (e.target.closest('.arcade-nav, #modal')) return;
+      isFiring = true;
+      setAimPos(e.clientX, e.clientY);
+    });
+    window.addEventListener('mouseup', () => isFiring = false);
+
+    window.addEventListener('touchmove', e => { e.preventDefault(); setAimPos(e.touches[0].clientX, e.touches[0].clientY); }, { passive:false });
+    window.addEventListener('touchstart', e => {
+      if (e.target.closest('.arcade-nav, #modal')) return;
+      setAimPos(e.touches[0].clientX, e.touches[0].clientY);
+    }, { passive:false });
+
+    // Keyboard
     window.addEventListener('keydown', e => {
-      if (e.key === 'ArrowLeft' || e.key === 'a') keys.left = true;
-      if (e.key === 'ArrowRight' || e.key === 'd') keys.right = true;
-      if (e.key === 'ArrowUp' || e.key === 'w') keys.thrust = true;
-      if (e.key === ' ' || e.key === 'z') { if (!keys.fire) shootBullet(); keys.fire = true; }
+      if (e.key === 'ArrowUp' || e.key === 'w') isThrusting = true;
+      if (e.key === ' ' || e.key === 'z') isFiring = true;
     });
     window.addEventListener('keyup', e => {
-      if (e.key === 'ArrowLeft' || e.key === 'a') keys.left = false;
-      if (e.key === 'ArrowRight' || e.key === 'd') keys.right = false;
-      if (e.key === 'ArrowUp' || e.key === 'w') keys.thrust = false;
-      if (e.key === ' ' || e.key === 'z') keys.fire = false;
+      if (e.key === 'ArrowUp' || e.key === 'w') isThrusting = false;
+      if (e.key === ' ' || e.key === 'z') isFiring = false;
     });
 
-    const bindTouch = (id, k, isAction) => {
+    const bindTouchBtn = (id, onStart, onEnd) => {
       const el = document.getElementById(id);
-      el.addEventListener('touchstart', e => {
-        e.preventDefault();
-        if (isAction) shootBullet();
-        keys[k] = true;
-      });
-      el.addEventListener('touchend', e => { e.preventDefault(); keys[k] = false; });
+      el.addEventListener('touchstart', e => { e.preventDefault(); onStart(); });
+      el.addEventListener('touchend', e => { e.preventDefault(); onEnd(); });
     };
-    bindTouch('btn-left', 'left'); bindTouch('btn-right', 'right');
-    bindTouch('btn-thrust', 'thrust'); bindTouch('btn-fire', 'fire', true);
+    bindTouchBtn('btn-thrust', () => isThrusting = true, () => isThrusting = false);
+    bindTouchBtn('btn-fire', () => isFiring = true, () => isFiring = false);
 
-    function shootBullet() {
-      if (isGameOver) return;
+    function shoot() {
       bullets.push({
         x: ship.x + Math.cos(ship.angle) * 18,
         y: ship.y + Math.sin(ship.angle) * 18,
-        vx: ship.vx + Math.cos(ship.angle) * 10,
-        vy: ship.vy + Math.sin(ship.angle) * 10,
+        vx: ship.vx + Math.cos(ship.angle) * 11,
+        vy: ship.vy + Math.sin(ship.angle) * 11,
         life: 50
       });
-      playLaser(880, 0.12);
+      playLaser(880, 0.08);
     }
 
     function restartGame() {
       score = 0; lives = 3; isGameOver = false;
-      ship.x = 400; ship.y = 300; ship.vx = 0; ship.vy = 0; ship.angle = -Math.PI/2; ship.invincible = 90;
+      ship.x = 400; ship.y = 300; ship.vx = 0; ship.vy = 0; ship.invincible = 60;
       bullets = []; asteroids = []; particles = [];
       spawnAsteroids(5);
       document.getElementById('score-val').textContent = '0';
@@ -146,13 +156,24 @@
     function loop() {
       if (isGameOver) return;
 
-      // Rotation & Thrust
-      if (keys.left) ship.angle -= 0.08;
-      if (keys.right) ship.angle += 0.08;
-      if (keys.thrust) {
-        ship.vx += Math.cos(ship.angle) * 0.22;
-        ship.vy += Math.sin(ship.angle) * 0.22;
-        // Thrust particles
+      // Smooth Angle Lerp
+      let diff = targetAngle - ship.angle;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      ship.angle += diff * 0.18;
+
+      // Shooting
+      if (isFiring) {
+        shootTimer++;
+        if (shootTimer % 7 === 1) shoot();
+      } else {
+        shootTimer = 0;
+      }
+
+      // Thrust Physics
+      if (isThrusting) {
+        ship.vx += Math.cos(ship.angle) * 0.25;
+        ship.vy += Math.sin(ship.angle) * 0.25;
         particles.push({
           x: ship.x - Math.cos(ship.angle) * 14,
           y: ship.y - Math.sin(ship.angle) * 14,
@@ -165,7 +186,7 @@
       ship.vx *= 0.985; ship.vy *= 0.985;
       ship.x += ship.vx; ship.y += ship.vy;
 
-      // Screen Wrap Ship
+      // Screen Wrap
       if (ship.x < 0) ship.x = 800; if (ship.x > 800) ship.x = 0;
       if (ship.y < 0) ship.y = 600; if (ship.y > 600) ship.y = 0;
       if (ship.invincible > 0) ship.invincible--;
@@ -183,15 +204,13 @@
           if (Math.hypot(b.x - a.x, b.y - a.y) < a.r) {
             score += a.tier * 50;
             document.getElementById('score-val').textContent = score;
-            playLaser(300, 0.2);
+            playLaser(350, 0.15);
 
-            // Fragment into smaller
             if (a.tier > 1) {
               asteroids.push(createAsteroid(a.x, a.y, a.r * 0.6, a.tier - 1));
               asteroids.push(createAsteroid(a.x, a.y, a.r * 0.6, a.tier - 1));
             }
 
-            // Explosion particles
             for (let p=0; p<8; p++) {
               particles.push({ x: a.x, y: a.y, vx:(Math.random()-0.5)*7, vy:(Math.random()-0.5)*7, color: a.color, life:1 });
             }
@@ -205,7 +224,6 @@
         if (b && b.life <= 0) bullets.splice(i, 1);
       }
 
-      // Respawn wave if cleared
       if (asteroids.length === 0) spawnAsteroids(6);
 
       // Update Asteroids
@@ -227,7 +245,7 @@
             document.getElementById('modal').style.display = 'flex';
             return;
           } else {
-            ship.x = 400; ship.y = 300; ship.vx = 0; ship.vy = 0; ship.invincible = 90;
+            ship.x = 400; ship.y = 300; ship.vx = 0; ship.vy = 0; ship.invincible = 60;
           }
         }
       }
