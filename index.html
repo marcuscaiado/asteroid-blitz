@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Asteroid Blitz 🛸✨ — Marcus Arcade</title>
+  <script src="arcade-sound-engine.js"></script>
   <script src="arcade-leaderboard.js"></script>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; touch-action:none; user-select:none; }
@@ -37,7 +38,7 @@
         width: calc(min(92vh, 600px) * 4 / 3);
       }
     }
-    canvas {
+    canvas:not(#dopamine-confetti-canvas) {
       width: 100%;
       height: 100%;
       display: block;
@@ -139,7 +140,7 @@
     }
     @media (max-width: 600px) {
       .aim-hint { display: none; }
-      .hud { font-size: 15px; }
+      .hud { z-index:20;  font-size: 15px;  }
       .ctrl-btn { width: 50px; height: 50px; font-size: 16px; }
       .fire-btn { width: 58px; height: 58px; font-size: 14px; }
     }
@@ -214,6 +215,10 @@
       return audioCtx;
     }
     function playLaser(freq, dur) {
+      if (window.arcadeAudio) {
+        window.arcadeAudio.playPop(freq ? freq / 450 : 1.0, dur || 0.1);
+        return;
+      }
       try {
         const c = getAudio();
         const osc = c.createOscillator();
@@ -486,7 +491,10 @@
             score += pts;
             document.getElementById('score-val').textContent = score;
 
-            if (window.DopamineSynth) {
+            if (window.arcadeAudio) {
+              window.arcadeAudio.playCollectStreak(a.tier);
+              window.arcadeAudio.playSoftThud(0.8 + a.tier * 0.2);
+            } else if (window.DopamineSynth) {
               window.DopamineSynth.playCombo(a.tier);
             } else {
               playLaser(350, 0.15);
@@ -615,7 +623,8 @@
 
           lives--;
           document.getElementById('lives-val').textContent = lives;
-          if (window.DopamineSynth) window.DopamineSynth.playThud(0.35);
+          if (window.arcadeAudio) window.arcadeAudio.playSoftThud(1.3);
+          else if (window.DopamineSynth) window.DopamineSynth.playThud(0.35);
           else playLaser(100, 0.4);
 
           for (let p = 0; p < 14; p++) {
@@ -631,7 +640,8 @@
 
           if (lives <= 0) {
             isGameOver = true;
-            if (window.DopamineSynth) window.DopamineSynth.playWin();
+            if (window.arcadeAudio) window.arcadeAudio.playTriumph();
+            else if (window.DopamineSynth) window.DopamineSynth.playWin();
             if (window.DopamineJuice) window.DopamineJuice.explodeConfetti(window.innerWidth / 2, window.innerHeight * 0.4, 65);
             document.getElementById('final-score').textContent = score;
             document.getElementById('modal').style.display = 'flex';
