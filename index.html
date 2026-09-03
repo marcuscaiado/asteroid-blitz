@@ -179,11 +179,20 @@
     .btn:active {
       transform: scale(0.96);
     }
-  </style>
+  
+/* Universal Mobile Touch & Top Navigation Safeguards */
+.arcade-nav, .arcade-link, .nav-btn-arcade, .arcade-corner-btn, .arcade-btn, .btn-arcade, a[href*="arcad"], #modal a, #modal button, .modal a, .modal button, #game-over-modal a, #game-over-modal button {
+  pointer-events: auto !important;
+  touch-action: auto !important;
+  cursor: pointer !important;
+  -webkit-tap-highlight-color: rgba(0, 245, 255, 0.4);
+}
+
+</style>
 </head>
 <body>
   <div id="canvas-container">
-    <a href="https://marcuscaiado.github.io/marcus-arcade/" class="arcade-nav">🕹️ Arcade Hub</a>
+    <a href="https://marcuscaiado.github.io/marcus-arcade/" class="arcade-nav" target="_top" onclick="if(window.top){window.top.location.href=this.href;return false;}" ontouchend="if(window.top){window.top.location.href=this.href;return false;}">🕹️ Arcade Hub</a>
     <div class="hud">SCORE: <span id="score-val">0</span> | LIVES: <span id="lives-val">3</span></div>
     <div class="aim-hint">Rotate: A/D or ◀/▶ • Thrust: W/▲ • Fire: Space/Click/⚡</div>
     <canvas id="gameCanvas" width="800" height="600"></canvas>
@@ -201,7 +210,7 @@
       <h1 id="modal-title">SHIP DESTROYED 💥</h1>
       <p style="font-size: 20px; font-weight: 700;">FINAL SCORE: <span id="final-score" style="color: #00f5ff;">0</span></p>
       <button class="btn" onclick="restartGame()">WARP IN AGAIN 🔄</button>
-      <a href="https://marcuscaiado.github.io/marcus-arcade/" class="btn" style="background:#16192b; border:1px solid #00f5ff;">ARCADE HUB 🕹️</a>
+      <a href="https://marcuscaiado.github.io/marcus-arcade/" class="btn" style="background:#16192b; border:1px solid #00f5ff;" target="_top" onclick="if(window.top){window.top.location.href=this.href;return false;}" ontouchend="if(window.top){window.top.location.href=this.href;return false;}">ARCADE HUB 🕹️</a>
     </div>
   </div>
 
